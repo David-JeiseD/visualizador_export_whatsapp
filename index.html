@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Visor de chat</title>
+<style>
+:root{--bg:#efeae2;--panel:#f0f2f5;--ink:#111b21;--mute:#667781;--me:#d9fdd3;--other-l:93%;--nl:34%;--chip:#ffffffcc;--line:#00000014;--hit:#ffe58a}
+@media(prefers-color-scheme:dark){:root{--bg:#0b141a;--panel:#202c33;--ink:#e9edef;--mute:#8696a0;--me:#005c4b;--other-l:20%;--nl:68%;--chip:#182229cc;--line:#ffffff14;--hit:#7a5c00}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+.sub{color:var(--mute);font-size:12px}
+.who{display:flex;gap:6px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:99px;background:var(--bg);font-size:12px}
+.av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;background:hsl(var(--h) 55% 42%)}
+.sp{flex:1}
+input[type=search]{padding:7px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:180px}
+button,label.btn{cursor:pointer;border:0;border-radius:99px;padding:7px 14px;background:#00a884;color:#fff;font:inherit;font-size:13px}
+button.g{background:var(--bg);color:var(--ink);padding:7px 10px}
+#chat{max-width:860px;margin:0 auto;padding:12px 12px 60px;display:flex;flex-direction:column}
+.day{position:sticky;top:58px;z-index:3;align-self:center;margin:14px 0 8px;padding:4px 12px;border-radius:8px;background:var(--chip);backdrop-filter:blur(6px);font-size:12px;color:var(--mute);text-transform:capitalize;box-shadow:0 1px 1px var(--line)}
+.sys{align-self:center;margin:6px 0;padding:4px 12px;border-radius:8px;background:var(--chip);font-size:12px;color:var(--mute);text-align:center;max-width:90%}
+.row{display:flex;margin-top:2px;max-width:100%}
+.row.first{margin-top:10px}
+.row.me{justify-content:flex-end}
+.b{max-width:min(78%,620px);padding:6px 9px 6px 11px;border-radius:10px;box-shadow:0 1px 1px var(--line);background:hsl(var(--h) 55% var(--other-l));word-wrap:anywhere;white-space:pre-wrap;position:relative}
+.me .b{background:var(--me)}
+.row.first .b{border-top-left-radius:2px}
+.row.me.first .b{border-top-left-radius:10px;border-top-right-radius:2px}
+.nm{font-weight:600;font-size:13px;color:hsl(var(--h) 65% var(--nl));margin-bottom:1px}
+.me .nm{color:#06a77d}
+.t{float:right;margin:6px 0 -3px 10px;font-size:11px;color:var(--mute)}
+.q{border-left:4px solid hsl(var(--h) 60% 50%);background:#00000012;border-radius:6px;padding:3px 8px;margin:2px 0 5px;font-size:13px;white-space:pre-wrap}
+.q b{display:block;font-size:12px;color:hsl(var(--h) 65% var(--nl))}
+.q span{color:var(--mute)}
+.m{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;background:#00000014;font-size:13px;color:var(--mute)}
+.fw{font-size:12px;color:var(--mute);font-style:italic;display:block}
+.del{color:var(--mute);font-style:italic}
+.hit .b,.b.hit{outline:2px solid #ffb800;background:var(--hit)}
+a{color:#53a6fa}
+#empty{max-width:520px;margin:12vh auto;text-align:center;padding:40px 24px;border:2px dashed var(--mute);border-radius:20px;color:var(--mute)}
+#empty h2{color:var(--ink);margin:0 0 8px}
+body.drag #empty{border-color:#00a884;background:#00a88418}
+@media(max-width:560px){.b{max-width:88%}input[type=search]{width:120px}.day{top:96px}}
+</style>
+</head>
+<body>
+<header hidden id="hd">
+  <div><h1 id="title"></h1><div class="sub" id="meta"></div></div>
+  <div class="who" id="who"></div>
+  <div class="sp"></div>
+  <input type="search" id="q" placeholder="Buscar…">
+  <span class="sub" id="cnt"></span>
+  <button class="g" id="prev">▲</button><button class="g" id="next">▼</button>
+  <label class="btn">Abrir otro<input type="file" id="f2" accept=".md,.txt" hidden></label>
+</header>
+<main id="chat">
+  <div id="empty">
+    <h2>Visor de chats de WhatsApp</h2>
+    <p>Arrastra aquí el export (<b>.md</b> o <b>.txt</b>) o</p>
+    <label class="btn">Elegir archivo<input type="file" id="f" accept=".md,.txt" hidden></label>
+    <p class="sub">Todo se procesa en tu navegador; nada se sube.</p>
+  </div>
+</main>
+<script>
+const MES={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
+const p2=n=>String(n).padStart(2,'0');
+const MEDIA=/^[\[<]\s*(imagen|sticker|video|mensaje de voz|audio|mensaje de [a-z]+|gif|documento)\b[^\]>]*[\]>]\s*(?:omitid[oa]\s*)?/i;
+
+// Devuelve [{d:'YYYY-MM-DD', t:'HH:MM', s:remitente|null, x:texto, sys, reply:{who,x}, fwd, media, del}]
+function parse(text){
+  text=text.replace(/^﻿/,'').replace(/[‎‏]/g,'');
+  const lines=text.split(/\r?\n/), out=[]; let cur=null;
+  if(/^\[\d+\/\d+\/\d+,? /m.test(text)){
+    const re=/^\[(\d+)\/(\d+)\/(\d+),? (\d+):(\d+)(?::\d+)?\s?([AaPp])?\.?[Mm]?\.?\]\s(.*)$/;
+    const raw=[];
+    for(const l of lines){
+      const m=re.exec(l);
+      if(m){cur={a:+m[1],b:+m[2],y:+m[3],h:+m[4],mi:m[5],ap:m[6],r:m[7]};raw.push(cur);}
+      else if(cur) cur.r+='\n'+l;
+    }
+    const dm=raw.some(r=>r.a>12); // d/m solo si algún primer número >12; si no, m/d
+    for(const r of raw){
+      const [mo,dd]=dm?[r.b,r.a]:[r.a,r.b];
+      let h=r.h; if(r.ap){const pm=/p/i.test(r.ap); h=h%12+(pm?12:0);}
+      const e={d:`${r.y<100?2000+r.y:r.y}-${p2(mo)}-${p2(dd)}`,t:`${p2(h)}:${r.mi}`};
+      if(r.r.startsWith('- ')){e.sys=true;e.x=r.r.slice(2);}
+      else{const m=/^([^:]{1,60}):(?: ([\s\S]*))?$/.exec(r.r); if(m){e.s=m[1];e.x=m[2]||'';}else{e.sys=true;e.x=r.r;}}
+      out.push(e);
+    }
+  }else{
+    let day=null;
+    for(const l of lines){
+      let m;
+      if((m=/^## (\d+) de (\p{L}+) de (\d+)/u.exec(l))){day=`${m[3]}-${p2(MES[m[2].toLowerCase()]||1)}-${p2(m[1])}`;cur=null;}
+      else if((m=/^\[(\d+):(\d+)\] (.*)$/.exec(l))&&day){
+        cur={d:day,t:`${p2(m[1])}:${m[2]}`};
+        const a=/^\*\*(.+?):\*\* ?(.*)$/.exec(m[3]);
+        if(a){cur.s=a[1];cur.x=a[2];}else{cur.sys=true;cur.x=m[3].replace(/^__|__$/g,'');}
+        out.push(cur);
+      }else if(cur&&l.trim()&&l!=='---'){
+        const q=/^> _(.+?): (.*)_$/.exec(l);
+        if(q&&!cur.x&&!cur.reply) cur.reply={who:q[1],x:q[2]};
+        else cur.x=cur.x?cur.x+'\n'+l:l;
+      }
+    }
+  }
+  for(const e of out){
+    if(e.sys) continue;
+    let x=e.x;
+    if(/^\[Reenviado\]\s*/.test(x)){e.fwd=true;x=x.replace(/^\[Reenviado\]\s*/,'');}
+    const m=MEDIA.exec(x);
+    if(m){e.media=m[1].replace(/^./,c=>c.toUpperCase()).replace(/album/i,'álbum');x=x.slice(m[0].length);}
+    if(/^_?Se eliminó este mensaje\.?_?$/.test(x.trim())){e.del=true;x='Se eliminó este mensaje';}
+    e.x=x.trim();
+  }
+  return out;
+}
+//--UI
+if(typeof document!=='undefined'){
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const link=s=>esc(s).replace(/https?:\/\/[^\s<]+/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const hue=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))%360;return h};
+const ICON={imagen:'🖼️',sticker:'🏷️',video:'🎞️','mensaje de voz':'🎤',audio:'🎤','mensaje de álbum':'🗂️',gif:'🎞️',documento:'📄'};
+let hits=[],hi=-1,ME='';
+
+function render(msgs,name){
+  const names=[...new Set(msgs.filter(m=>!m.sys).map(m=>m.s))];
+  ME=names.find(n=>/^(tú|tu|you|yo)$/i.test(n))||names[0];
+  const cnt={};msgs.forEach(m=>m.s&&(cnt[m.s]=(cnt[m.s]||0)+1));
+  $('#title').textContent=name.replace(/\.(md|txt)$/i,'');
+  $('#meta').textContent=`${msgs.length} mensajes · ${msgs[0]?.d} → ${msgs.at(-1)?.d}`;
+  $('#who').innerHTML=names.map(n=>`<span class="pill" style="--h:${n===ME?160:hue(n)}"><span class="av">${esc(n[0]||'?')}</span>${esc(n)} · ${cnt[n]}${n===ME?' (derecha)':''}</span>`).join('');
+  let h='',day='',prev=null,first=true;
+  for(const m of msgs){
+    if(m.d!==day){day=m.d;const [y,mo,d]=day.split('-');
+      h+=`<div class="day">${new Date(y,mo-1,d).toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>`;prev=null;}
+    if(m.sys){h+=`<div class="sys">${link(m.x)}</div>`;prev=null;continue;}
+    const run=prev&&prev.s===m.s&&(+m.t.slice(0,2)*60+ +m.t.slice(3))-(+prev.t.slice(0,2)*60+ +prev.t.slice(3))<5&&(+m.t.slice(0,2)*60+ +m.t.slice(3))>=(+prev.t.slice(0,2)*60+ +prev.t.slice(3));
+    prev=m;
+    const me=m.s===ME;
+    let b='';
+    if(!run) b+=`<div class="nm">${esc(m.s)}</div>`;
+    if(m.reply) b+=`<div class="q" style="--h:${m.reply.who===ME?160:hue(m.reply.who)}"><b>${esc(m.reply.who)}</b><span>${esc(m.reply.x)}</span></div>`;
+    if(m.fwd) b+=`<span class="fw">↪ Reenviado</span>`;
+    if(m.media){const k=m.media.toLowerCase();b+=`<span class="m">${ICON[k]||'📎'} ${esc(m.media)}</span>`+(m.x?'<br>':'');}
+    if(m.x) b+=m.del?`<span class="del">🚫 ${esc(m.x)}</span>`:link(m.x);
+    h+=`<div class="row ${me?'me':''} ${run?'':'first'}" style="--h:${me?160:hue(m.s)}"><div class="b">${b}<span class="t">${m.t}</span></div></div>`;
+  }
+  $('#chat').innerHTML=h;$('#hd').hidden=false;search();
+  scrollTo(0,0);
+}
+function search(){
+  const q=$('#q').value.trim().toLowerCase();
+  document.querySelectorAll('.b.hit').forEach(e=>e.classList.remove('hit'));
+  hits=q?[...document.querySelectorAll('.b')].filter(e=>e.textContent.toLowerCase().includes(q)):[];
+  hits.forEach(e=>e.classList.add('hit'));hi=-1;
+  $('#cnt').textContent=q?hits.length+' coincidencias':'';
+}
+function go(d){if(!hits.length)return;hi=(hi+d+hits.length)%hits.length;hits[hi].scrollIntoView({block:'center',behavior:'smooth'});$('#cnt').textContent=`${hi+1}/${hits.length}`;}
+async function load(f){if(!f)return;const msgs=parse(await f.text());
+  if(!msgs.length){alert('No reconocí el formato del archivo.');return;}render(msgs,f.name);}
+$('#f').onchange=$('#f2').onchange=e=>{load(e.target.files[0]);e.target.value='';};
+$('#q').oninput=search;$('#q').onkeydown=e=>e.key==='Enter'&&go(e.shiftKey?-1:1);
+$('#next').onclick=()=>go(1);$('#prev').onclick=()=>go(-1);
+addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drag')});
+addEventListener('dragleave',()=>document.body.classList.remove('drag'));
+addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');load(e.dataTransfer.files[0]);});
+}
+</script>
+</body>
+</html>
